@@ -3,7 +3,7 @@ A event driven microservice architecture task
 
 
 Frontend API:
-POST /users/ - Enroll a user user created
+POST /users/ - Enroll a user
 
 GET /books/ - List all available books
 
