@@ -1,0 +1,87 @@
+version: '3.8'
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq_container1
+    ports:
+      - "5672:5672"
+      - "15672:15672"  # Management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  backcore_db:
+    image: postgres:13
+    container_name: backcore_db_container
+    environment:
+      POSTGRES_DB: 'backend'
+      POSTGRES_USER: 'welzatm'
+      POSTGRES_PASSWORD: 'Mayflower48'
+    volumes:
+      - backcore_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U welzatm -d backend"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  frontcore_db:
+    image: postgres:13
+    container_name: frontcore_db_container
+    environment:
+      POSTGRES_DB: 'frontend'
+      POSTGRES_USER: 'welzatm'
+      POSTGRES_PASSWORD: 'Mayflower48'
+    volumes:
+      - frontcore_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U welzatm -d frontend"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./BackCore
+    container_name: backcore_container
+    command: sh /app/entrypoint.sh
+    environment:
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - DATABASE_URL=postgres://welzatm:Mayflower48@backcore_db_container:5432/backend
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/?heartbeat=600
+    volumes:
+      - ./BackCore:/app
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backcore_db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+
+  frontend:
+    build: ./FrontCore
+    container_name: frontcore_container
+    command: sh /app/entrypoint.sh
+    environment:
+      - DJANGO_SETTINGS_MODULE=frontend.settings
+      - DATABASE_URL=postgres://welzatm:Mayflower48@frontcore_db_container:5432/frontend
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/?heartbeat=600
+    volumes:
+      - ./FrontCore:/app
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      frontcore_db:
+        condition: service_healthy
+    ports:
+      - "8002:8000"
+
+volumes:
+  backcore_data:
+  frontcore_data:
